@@ -10,6 +10,7 @@ https://debezium.io/documentation/reference/1.9/connectors/mysql.html#enable-mys
 for MySql 5.x
 ```shell
 mysql> SELECT variable_value as "BINARY LOGGING STATUS (log-bin) ::" FROM information_schema.global_variables WHERE variable_name='log_bin';
+```
 
 for MySql 8.x
 ```shell
