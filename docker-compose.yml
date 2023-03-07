@@ -1,0 +1,102 @@
+version: '3'
+
+services:
+
+  # Debezium Connect 1.9
+  # https://debezium.io/releases/1.9/
+  db-mysql:
+    image: mysql:5.7
+    container_name: db-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'mydb'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: '123456'
+      MYSQL_ROOT_PASSWORD: '123456'
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./volumes/mysql_data:/var/lib/mysql
+      - "./mysql.cnf:/etc/mysql/conf.d/custom.cnf"
+    networks:
+      - web
+  
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - web
+      
+  kafka:
+    image: wurstmeister/kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_CREATE_TOPICS: "test:1:1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ZOOKEEPER_TIMEOUT_MS: 36000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - web
+
+  # psql --dbname=debeziumtest --username=codebaseuser --password
+  db-postgres:
+    container_name: db-postgres
+    working_dir: /usr/app
+    volumes:
+        - ./volumes/postgres_data:/var/lib/postgresql/data
+    image: 'postgres:11.18-alpine'
+    environment:
+      POSTGRES_USER: codebaseuser
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB : debeziumtest
+      PG_VERSION: '11.18-alpine'
+    ports:
+        - "5432:5432"
+    networks:
+      - web
+    
+  # https://hub.docker.com/r/debezium/connect
+  connect:
+    image: debezium/connect-jdbc:${DEBEZIUM_VERSION}
+    build:
+      context: debezium-jdbc
+      args:
+        DEBEZIUM_VERSION: ${DEBEZIUM_VERSION}
+    container_name: connect
+    ports:
+      - 8083:8083
+    networks:
+      - web
+    depends_on:
+      - kafka
+      - db-mysql
+      - db-postgres
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_source_connect_statuses
+      - ENABLE_DEBEZIUM_SCRIPTING=true
+      # - CONNECT_REST_EXTENSION_CLASSES=io.debezium.kcrestextension.DebeziumConnectRestExtension
+  
+  debezium-ui:
+    container_name: debezium-ui
+    image: quay.io/debezium/debezium-ui:${DEBEZIUM_VERSION}
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CONNECT_URIS=http://connect:8083
+    depends_on:
+      - connect
+    networks:
+      - web
+networks:
+  web:
+    driver: bridge
