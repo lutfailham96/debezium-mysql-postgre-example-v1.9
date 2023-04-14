@@ -1,0 +1,88 @@
+version: '3'
+
+services:
+
+  # Debezium Connect 1.9
+  # https://debezium.io/releases/1.9/
+  db-mysql:
+    image: mysql:5.7
+    container_name: db-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'mydb'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: '123456'
+      MYSQL_ROOT_PASSWORD: '123456'
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./volumes/mysql_data:/var/lib/mysql
+      - "./mysql.cnf:/etc/mysql/conf.d/custom.cnf"
+    networks:
+      - web
+
+  # psql --dbname=debeziumtest --username=codebaseuser --password
+  db-postgres:
+    container_name: db-postgres
+    working_dir: /usr/app
+    volumes:
+        - ./volumes/postgres_data:/var/lib/postgresql/data
+    image: 'postgres:11.18-alpine'
+    environment:
+      POSTGRES_USER: codebaseuser
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB : debeziumtest
+      PG_VERSION: '11.18-alpine'
+    ports:
+        - "5432:5432"
+    networks:
+      - web
+    
+  # https://hub.docker.com/r/debezium/connect
+  connect:
+    image: debezium/connect-jdbc:${DEBEZIUM_VERSION}
+    build:
+      context: debezium-jdbc
+      args:
+        DEBEZIUM_VERSION: ${DEBEZIUM_VERSION}
+    container_name: connect
+    ports:
+      - 8083:8083
+    networks:
+      - web
+    depends_on:
+      - db-mysql
+      - db-postgres
+    environment:
+      - BOOTSTRAP_SERVERS=kafka1:9093,kafka2:9093,kafka3:9093
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_source_connect_statuses
+      - ENABLE_DEBEZIUM_SCRIPTING=true
+      - CONNECT_SECURITY_PROTOCOL=SASL_PLAINTEXT
+      - CONNECT_SASL_MECHANISM=PLAIN
+      - CONNECT_SASL_JAAS_CONFIG=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="mypass";
+
+      - CONNECT_PRODUCER_SECURITY_PROTOCOL=SASL_PLAINTEXT
+      - CONNECT_PRODUCER_SASL_JAAS_CONFIG=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="mypass";
+      - CONNECT_PRODUCER_SASL_MECHANISM=PLAIN
+      - CONNECT_CONSUMER_SECURITY_PROTOCOL=SASL_PLAINTEXT
+      - CONNECT_CONSUMER_SASL_JAAS_CONFIG=org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="mypass";
+      - CONNECT_CONSUMER_SASL_MECHANISM=PLAIN
+      # - CONNECT_REST_EXTENSION_CLASSES=io.debezium.kcrestextension.DebeziumConnectRestExtension
+  
+  debezium-ui:
+    container_name: debezium-ui
+    image: quay.io/debezium/debezium-ui:${DEBEZIUM_VERSION}
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CONNECT_URIS=http://connect:8083
+    depends_on:
+      - connect
+    networks:
+      - web
+networks:
+  web:
+    driver: bridge

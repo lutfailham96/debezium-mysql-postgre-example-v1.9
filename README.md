@@ -76,6 +76,19 @@ debeziumtest=# SELECT * FROM "public"."mysqldbserver1_mydbMOVIE";
 (2 rows)
 ```
 
+#### Kafka CLI
+
+List `topic`
+```shell
+$ /bin/kafka-topics.sh --zookeeper zookeeper:2181 --list
+```
+
+Subscribe to `topic`
+```shell
+$ /bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic topic-name --from-beginning
+```
+
 #### Reference:
 - https://github.com/debezium/debezium-examples/tree/1.x/unwrap-smt
 - https://debezium.io/documentation/reference/1.9/connectors/mysql.html#enable-mysql-binlog
+- https://docs.confluent.io/kafka-connectors/debezium-mysql-source/current/mysql_source_connector_config.html#signal-parameters
