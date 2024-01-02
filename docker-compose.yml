@@ -97,6 +97,27 @@ services:
       - connect
     networks:
       - web
+
+  kafka-ui:
+    container_name: kafka-ui
+    image: playcourt/jenkins:kafka-ui-v0.3.1
+    ports:
+      - "8090:8080"
+    environment:
+      - AUTH_TYPE=LOGIN_FORM
+      - JAVA_OPTS=-Dlog4j2.formatMsgNoLookups=true
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_NAME=kafka
+      - KAFKA_CLUSTERS_0_READONLY=false
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      - SERVER_SERVLET_CONTEXT_PATH=/
+      - SPRING_SECURITY_USER_NAME=admin
+      - SPRING_SECURITY_USER_PASSWORD=admin
+    depends_on:
+      - kafka
+    networks:
+      - web
+
 networks:
   web:
     driver: bridge
